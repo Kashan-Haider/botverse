@@ -23,6 +23,6 @@ retriever = EnsembleRetriever(
 )
 
 
-query = "Your search query here"
+query = "toyota"
 results = retriever.invoke(query)
 print(results)
