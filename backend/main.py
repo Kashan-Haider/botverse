@@ -153,7 +153,7 @@ async def create_chatbot(
 ):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
-    
+    print(authorization)
     token = authorization.replace("Bearer ", "")
     try:
         users_username = get_current_user(token)
