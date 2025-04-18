@@ -1,7 +1,6 @@
-# main.py
 from fastapi import FastAPI, Depends, HTTPException
-from sqlmodel import Session, select
-from models.model import User, UserLogin
+from sqlalchemy.orm import Session
+from models.model import User, UserBase, UserLogin
 from database.db import create_db_and_tables, get_session
 from passlib.context import CryptContext
 import os
@@ -11,7 +10,7 @@ from jose import jwt
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -19,7 +18,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # or ["*"] for dev
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,22 +26,17 @@ app.add_middleware(
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-
-# Hashing functions
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 0.05  # 30 minutes
-REFRESH_TOKEN_EXPIRE_MINUTES = 0.1  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 0.05
+REFRESH_TOKEN_EXPIRE_MINUTES = 0.1
 ALGORITHM = "HS256"
-JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]  # should be kept secret
-JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]  # should be kept secret
-
+JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]
 
 def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
@@ -56,7 +50,6 @@ def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> 
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, ALGORITHM)
     return encoded_jwt
 
-
 def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
         expires = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
@@ -69,59 +62,51 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) ->
     encoded_jwt = jwt.encode(to_encode, JWT_REFRESH_SECRET_KEY, ALGORITHM)
     return encoded_jwt
 
-    
-
-@app.on_event("startup")
+@asynccontextmanager
 def on_startup():
     create_db_and_tables()
-
 
 @app.get("/")
 def read_root():
     return {"message": "hello world"}
 
-
 @app.get("/users")
 def read_users(session: Session = Depends(get_session)):
-    statement = select(User)
-    users = session.exec(statement).all()
+    users = session.query(User).all()
     if users:
         return users
     else:
         return "No users registered"
 
-
 @app.get("/users/{id}")
 def read_user(id: int, session: Session = Depends(get_session)):
-    statement = select(User).where(User.id == id)
-    user = session.exec(statement).first()
+    user = session.query(User).filter(User.id == id).first()
     if user:
         return user
     else:
         return {"detail": "No user with such id"}
 
-
 @app.post("/signup")
-def register_user(user: User, session: Session = Depends(get_session)):
-    # Check if username already exists
-    statement = select(User).where(User.username == user.username)
-    existing_user = session.exec(statement).first()
+def register_user(user: UserBase, session: Session = Depends(get_session)):
+    existing_user = session.query(User).filter(User.username == user.username).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    # Hash the user's password before storing
-    user.password = hash_password(user.password)
+    hashed_password = hash_password(user.password)
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        password=hashed_password
+    )
 
-    session.add(user)
+    session.add(new_user)
     session.commit()
-    session.refresh(user)
+    session.refresh(new_user)
     return {"message": "User registered successfully"}
-
 
 @app.post("/login")
 def login_user(user: UserLogin, session: Session = Depends(get_session)):
-    statement = select(User).where(User.username == user.username)
-    registered_user = session.exec(statement).first()
+    registered_user = session.query(User).filter(User.username == user.username).first()
 
     if not registered_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -129,10 +114,10 @@ def login_user(user: UserLogin, session: Session = Depends(get_session)):
     if not verify_password(user.password, registered_user.password):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    access_token = create_access_token(subject=user)
-    refresh_token = create_refresh_token(subject=user)
+    access_token = create_access_token(subject=user.username)
+    refresh_token = create_refresh_token(subject=user.username)
     
-    return ({'access_token' : access_token, 'refresh_token': refresh_token})
+    return {'access_token': access_token, 'refresh_token': refresh_token}
 
 @app.get('/verify-token/{token}')
 def verify_user_token(token:str):
@@ -144,8 +129,6 @@ def verify_user_token(token:str):
         return payload
     except:
         raise HTTPException(status_code=403, detail="Token is invalid or expired")
-
-
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str

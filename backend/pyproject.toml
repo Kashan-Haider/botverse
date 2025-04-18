@@ -13,16 +13,18 @@ dependencies = [
     "python-jose[cryptography] (>=3.4.0,<4.0.0)",
     "passlib[bcrypt] (>=1.7.4,<2.0.0)",
     "prisma (>=0.15.0,<0.16.0)",
-    "sqlmodel (>=0.0.24,<0.0.25)",
     "psycopg2-binary (>=2.9.10,<3.0.0)",
     "dotenv (>=0.9.9,<0.10.0)",
-    "python-multipart (>=0.0.20,<0.0.21)"
+    "python-multipart (>=0.0.20,<0.0.21)",
+    "sqlalchemy (>=2.0.40,<3.0.0)"
 ]
 
 [tool.poetry]
 packages = [{include = "botverse", from = "src"}]
+package-mode = false
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
