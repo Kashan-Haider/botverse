@@ -2,7 +2,7 @@
 name = "botverse"
 version = "0.1.0"
 description = ""
-authors = [
+authors = [ 
     {name = "Kashan Haider",email = "hkashan.dev@gmail.com"}
 ]
 readme = "README.md"

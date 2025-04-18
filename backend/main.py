@@ -38,7 +38,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 0.05  # 30 minutes
-REFRESH_TOKEN_EXPIRE_MINUTES = 60  # 7 days
+REFRESH_TOKEN_EXPIRE_MINUTES = 0.1  # 7 days
 ALGORITHM = "HS256"
 JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]  # should be kept secret
 JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]  # should be kept secret
