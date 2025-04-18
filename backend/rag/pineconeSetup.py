@@ -3,7 +3,7 @@ from pinecone import ServerlessSpec
 from dotenv import load_dotenv
 import os
 
-def connect_pinecone(index_name: str) -> Pinecone.Index:
+def connectPinecone(index_name: str) -> Pinecone.Index:
     load_dotenv()
     PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
@@ -23,4 +23,4 @@ def connect_pinecone(index_name: str) -> Pinecone.Index:
     return index
 
 
-connect_pinecone('test-index')
+connectPinecone('test-index')

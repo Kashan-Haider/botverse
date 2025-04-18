@@ -1,11 +1,11 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from pinecone_setup import connect_pinecone
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.retrievers import PineconeHybridSearchRetriever
 from pinecone_text.sparse import BM25Encoder
+from rag.pineconeSetup import connectPinecone
 
 def get_retriever(index_name: str, alpha: float, bm25_model: BM25Encoder) -> PineconeHybridSearchRetriever:
-    index = connect_pinecone(index_name=index_name)
+    index = connectPinecone(index_name=index_name)
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     retriever = PineconeHybridSearchRetriever(
         embeddings=embeddings,
@@ -31,7 +31,7 @@ def file_handling(file_content: str) -> bool:
         bm25_model = BM25Encoder()
         bm25_model.fit(processed_chunks)
         print("BM25 model fitted successfully")
-        retriever = get_retriever("test-index", 0.7, bm25_model)
+        retriever = get_retriever("botverse", 0.7, bm25_model)
         successful_chunks = []
         for i, chunk in enumerate(processed_chunks, start=1):
             try:

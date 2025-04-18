@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Form, UploadFile, File, Header
 from sqlalchemy.orm import Session
-from models.model import User, UserBase, UserLogin
+from models.model import User, UserBase, UserLogin, Chatbot
 from database.db import create_db_and_tables, get_session
 from passlib.context import CryptContext
 import os
@@ -10,11 +10,15 @@ from jose import jwt
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
+from rag.user_file_handling import file_handling
 
 load_dotenv()
 
-app = FastAPI()
+async def lifespan_handler(app: FastAPI):
+    create_db_and_tables()
+    yield
+    
+app = FastAPI(lifespan=lifespan_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,17 +30,17 @@ app.add_middleware(
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
+ALGORITHM = "HS256"
+JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
-
-ACCESS_TOKEN_EXPIRE_MINUTES = 0.05
-REFRESH_TOKEN_EXPIRE_MINUTES = 0.1
-ALGORITHM = "HS256"
-JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
-JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]
 
 def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
@@ -47,8 +51,7 @@ def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> 
         )
 
     to_encode = {"exp": expires, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, JWT_SECRET_KEY, ALGORITHM)
 
 def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
@@ -59,12 +62,7 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) ->
         )
 
     to_encode = {"exp": expires, "sub": str(subject)}
-    encoded_jwt = jwt.encode(to_encode, JWT_REFRESH_SECRET_KEY, ALGORITHM)
-    return encoded_jwt
-
-@asynccontextmanager
-def on_startup():
-    create_db_and_tables()
+    return jwt.encode(to_encode, JWT_REFRESH_SECRET_KEY, ALGORITHM)
 
 @app.get("/")
 def read_root():
@@ -73,18 +71,12 @@ def read_root():
 @app.get("/users")
 def read_users(session: Session = Depends(get_session)):
     users = session.query(User).all()
-    if users:
-        return users
-    else:
-        return "No users registered"
+    return users if users else "No users registered"
 
 @app.get("/users/{id}")
 def read_user(id: int, session: Session = Depends(get_session)):
     user = session.query(User).filter(User.id == id).first()
-    if user:
-        return user
-    else:
-        return {"detail": "No user with such id"}
+    return user if user else {"detail": "No user with such id"}
 
 @app.post("/signup")
 def register_user(user: UserBase, session: Session = Depends(get_session)):
@@ -92,11 +84,10 @@ def register_user(user: UserBase, session: Session = Depends(get_session)):
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
 
-    hashed_password = hash_password(user.password)
     new_user = User(
         username=user.username,
         email=user.email,
-        password=hashed_password
+        password=hash_password(user.password)
     )
 
     session.add(new_user)
@@ -107,23 +98,21 @@ def register_user(user: UserBase, session: Session = Depends(get_session)):
 @app.post("/login")
 def login_user(user: UserLogin, session: Session = Depends(get_session)):
     registered_user = session.query(User).filter(User.username == user.username).first()
-
     if not registered_user:
         raise HTTPException(status_code=404, detail="User not found")
-
     if not verify_password(user.password, registered_user.password):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    access_token = create_access_token(subject=user.username)
-    refresh_token = create_refresh_token(subject=user.username)
-    
-    return {'access_token': access_token, 'refresh_token': refresh_token}
+    return {
+        'access_token': create_access_token(subject=user.username),
+        'refresh_token': create_refresh_token(subject=user.username)
+    }
 
 @app.get('/verify-token/{token}')
-def verify_user_token(token:str):
+def verify_user_token(token: str):
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, ALGORITHM)
-        username: str = payload.get("sub")
+        username = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=403, detail="Username is not valid")
         return payload
@@ -140,7 +129,53 @@ def refresh_access_token(request: RefreshTokenRequest):
         username = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=403, detail="Invalid refresh token")
-        new_access_token = create_access_token(subject=username)
-        return {"access_token": new_access_token}
+        return {"access_token": create_access_token(subject=username)}
     except:
         raise HTTPException(status_code=403, detail="Invalid or expired refresh token")
+
+def get_current_user(token: str) -> User:
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, ALGORITHM)
+        username = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=403, detail="Username is not valid")
+        return payload["sub"]
+    except:
+        raise HTTPException(status_code=403, detail="Token is invalid or expired")
+
+@app.post("/create-chatbot")
+async def create_chatbot(
+    chatbot_name: str = Form(...),
+    chatbot_prompt: str = Form(...),
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    authorization: str = Header(None),
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    try:
+        users_username = get_current_user(token)
+        
+        raw_bytes = await file.read()
+        try:
+            text_content = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File must be UTF-8 text")
+        processed = file_handling(text_content)
+        bot = Chatbot(
+            name=chatbot_name,
+            prompt=chatbot_prompt,
+            file_content=processed,
+            username=users_username
+        )
+        session.add(bot)
+        session.commit()
+        session.refresh(bot)
+        return {"message": "Chatbot created successfully", "name": bot.name}
+    except Exception as e:
+        raise HTTPException(status_code=403, detail="Token is invalid or expired")
+    
+    
+    
