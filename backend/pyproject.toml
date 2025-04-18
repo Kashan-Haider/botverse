@@ -6,7 +6,7 @@ authors = [
     {name = "Kashan Haider",email = "hkashan.dev@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "fastapi[standard] (>=0.115.12,<0.116.0)",
     "uvicorn (>=0.34.1,<0.35.0)",
@@ -16,7 +16,13 @@ dependencies = [
     "psycopg2-binary (>=2.9.10,<3.0.0)",
     "dotenv (>=0.9.9,<0.10.0)",
     "python-multipart (>=0.0.20,<0.0.21)",
-    "sqlalchemy (>=2.0.40,<3.0.0)"
+    "sqlalchemy (>=2.0.40,<3.0.0)",
+    "langchain (>=0.3.23,<0.4.0)",
+    "langchain-community (>=0.3.21,<0.4.0)",
+    "pinecone (>=6.0.2,<7.0.0)",
+    "pinecone[grpc] (>=6.0.2,<7.0.0)",
+    "pinecone-text (>=0.10.0,<0.11.0)",
+    "langchain-huggingface (>=0.1.2,<0.2.0)"
 ]
 
 [tool.poetry]
