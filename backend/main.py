@@ -183,6 +183,7 @@ async def create_chatbot(
 
         payload = {
             "username": users_username,
+            "chatbot_name": chatbot_name,
             "exp": int((datetime.now(timezone.utc) + timedelta(days=3650)).timestamp()),
         }
         bot_token = jwt.encode(payload, JWT_SECRET_KEY_FOR_CHATBOT, algorithm="HS256")
