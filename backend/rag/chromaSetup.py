@@ -1,28 +1,67 @@
-from langchain.retrievers.ensemble import EnsembleRetriever
-from langchain_chroma import Chroma
-from langchain_community.retrievers import BM25Retriever
+# import nltk
+import chromadb
+import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Dense retriever
-embedding = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-dense = Chroma(
-    collection_name="example_collection",
-    embedding_function=embedding,
-    persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
-)
+# nltk.download("punkt")
 
-# Sparse retriever (BM25)
-texts = ["your_docs", "my docs"]
-documents = [Document(page_content=text) for text in texts]
-sparse = BM25Retriever.from_documents(documents)
 
-# Combine both
-retriever = EnsembleRetriever(
-    retrievers=[dense.as_retriever(), sparse], weights=[0.5, 0.5]
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2", model_kwargs={"device": "cpu"}
 )
 
 
-query = "toyota"
-results = retriever.invoke(query)
-print(results)
+class LangchainEmbeddingFunction:
+    def __init__(self, embeddings):
+        self.embeddings = embeddings
+
+    def __call__(self, input):
+        return np.array(self.embeddings.embed_documents(input))
+
+
+chroma_client = chromadb.HttpClient(host="localhost", port=8001)
+
+embedding_function = LangchainEmbeddingFunction(embeddings)
+collection = chroma_client.get_or_create_collection(
+    name="cars", embedding_function=embedding_function
+)
+
+
+def upsert_data(data):
+
+    with open("../test-data.txt", "r") as file:
+        content = file.read()
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100,
+        separators=["\n\n", "\n", ". ", " ", ""],
+        length_function=len,
+    )
+    chunks = text_splitter.split_text(content)
+    print(f"Split text into {len(chunks)} chunks")
+
+    batch_size = 50
+    for i in range(0, len(chunks), batch_size):
+        batch_chunks = chunks[i : i + batch_size]
+        batch_ids = [f"chunk_{i+j}" for j in range(len(batch_chunks))]
+
+        try:
+            collection.add(documents=batch_chunks, ids=batch_ids)
+            print(
+                f"✅ Added batch {i//batch_size + 1}/{(len(chunks)-1)//batch_size + 1}"
+            )
+        except Exception as e:
+            print(f"❌ Error adding batch {i//batch_size + 1}: {str(e)}")
+            print(f"Error details: {e}")
+
+    print("✅ Data processing complete!")
+
+
+def query(query):
+    results = collection.query(
+        query_texts=[query],
+        n_results=10,
+    )
+    return results

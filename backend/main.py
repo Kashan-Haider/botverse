@@ -14,15 +14,17 @@ from rag.user_file_handling import file_handling
 
 load_dotenv()
 
+
 async def lifespan_handler(app: FastAPI):
     create_db_and_tables()
     yield
-    
+
+
 app = FastAPI(lifespan=lifespan_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,11 +38,14 @@ ALGORITHM = "HS256"
 JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
 JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]
 
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
@@ -53,6 +58,7 @@ def create_access_token(subject: Union[str, Any], expires_delta: int = None) -> 
     to_encode = {"exp": expires, "sub": str(subject)}
     return jwt.encode(to_encode, JWT_SECRET_KEY, ALGORITHM)
 
+
 def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) -> str:
     if expires_delta is not None:
         expires = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
@@ -64,19 +70,23 @@ def create_refresh_token(subject: Union[str, Any], expires_delta: int = None) ->
     to_encode = {"exp": expires, "sub": str(subject)}
     return jwt.encode(to_encode, JWT_REFRESH_SECRET_KEY, ALGORITHM)
 
+
 @app.get("/")
 def read_root():
     return {"message": "hello world"}
+
 
 @app.get("/users")
 def read_users(session: Session = Depends(get_session)):
     users = session.query(User).all()
     return users if users else "No users registered"
 
+
 @app.get("/users/{id}")
 def read_user(id: int, session: Session = Depends(get_session)):
     user = session.query(User).filter(User.id == id).first()
     return user if user else {"detail": "No user with such id"}
+
 
 @app.post("/signup")
 def register_user(user: UserBase, session: Session = Depends(get_session)):
@@ -85,15 +95,14 @@ def register_user(user: UserBase, session: Session = Depends(get_session)):
         raise HTTPException(status_code=400, detail="Username already exists")
 
     new_user = User(
-        username=user.username,
-        email=user.email,
-        password=hash_password(user.password)
+        username=user.username, email=user.email, password=hash_password(user.password)
     )
 
     session.add(new_user)
     session.commit()
     session.refresh(new_user)
     return {"message": "User registered successfully"}
+
 
 @app.post("/login")
 def login_user(user: UserLogin, session: Session = Depends(get_session)):
@@ -104,11 +113,12 @@ def login_user(user: UserLogin, session: Session = Depends(get_session)):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
     return {
-        'access_token': create_access_token(subject=user.username),
-        'refresh_token': create_refresh_token(subject=user.username)
+        "access_token": create_access_token(subject=user.username),
+        "refresh_token": create_refresh_token(subject=user.username),
     }
 
-@app.get('/verify-token/{token}')
+
+@app.get("/verify-token/{token}")
 def verify_user_token(token: str):
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, ALGORITHM)
@@ -119,8 +129,10 @@ def verify_user_token(token: str):
     except:
         raise HTTPException(status_code=403, detail="Token is invalid or expired")
 
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
 
 @app.post("/refresh")
 def refresh_access_token(request: RefreshTokenRequest):
@@ -133,6 +145,7 @@ def refresh_access_token(request: RefreshTokenRequest):
     except:
         raise HTTPException(status_code=403, detail="Invalid or expired refresh token")
 
+
 def get_current_user(token: str) -> User:
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, ALGORITHM)
@@ -142,6 +155,7 @@ def get_current_user(token: str) -> User:
         return payload["sub"]
     except:
         raise HTTPException(status_code=403, detail="Token is invalid or expired")
+
 
 @app.post("/create-chatbot")
 async def create_chatbot(
@@ -153,22 +167,18 @@ async def create_chatbot(
 ):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
-    print(authorization)
     token = authorization.replace("Bearer ", "")
     try:
         users_username = get_current_user(token)
-        
-        raw_bytes = await file.read()
-        try:
-            text_content = raw_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="File must be UTF-8 text")
-        processed = file_handling(text_content)
+
+        with open("../test-data.txt", "r", encoding="utf-8") as file:
+            content = file.read()
+            processed = file_handling(content)
         bot = Chatbot(
             name=chatbot_name,
             prompt=chatbot_prompt,
             file_content=processed,
-            username=users_username
+            username=users_username,
         )
         session.add(bot)
         session.commit()
@@ -176,6 +186,3 @@ async def create_chatbot(
         return {"message": "Chatbot created successfully", "name": bot.name}
     except Exception as e:
         raise HTTPException(status_code=403, detail="Token is invalid or expired")
-    
-    
-    
