@@ -36,6 +36,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 ALGORITHM = "HS256"
 JWT_SECRET_KEY = os.environ["JWT_SECRET_KEY"]
+JWT_SECRET_KEY_FOR_CHATBOT = os.environ["JWT_SECRET_KEY_FOR_CHATBOT"]
 JWT_REFRESH_SECRET_KEY = os.environ["JWT_REFRESH_SECRET_KEY"]
 
 
@@ -165,24 +166,43 @@ async def create_chatbot(
     session: Session = Depends(get_session),
     authorization: str = Header(None),
 ):
+    # Check authorization
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
+
     token = authorization.replace("Bearer ", "")
+
     try:
         users_username = get_current_user(token)
 
-        with open("../test-data.txt", "r", encoding="utf-8") as file:
-            content = file.read()
-            processed = file_handling(content)
-        bot = Chatbot(
-            name=chatbot_name,
-            prompt=chatbot_prompt,
-            file_content=processed,
-            username=users_username,
-        )
-        session.add(bot)
-        session.commit()
-        session.refresh(bot)
-        return {"message": "Chatbot created successfully", "name": bot.name}
+        # Read file content correctly - UploadFile needs to be handled differently
+        content = await file.read()
+        content_str = content.decode("utf-8")
+        processed = file_handling(content_str)
+        print(processed)
+
+        payload = {
+            "username": users_username,
+            "exp": int((datetime.now(timezone.utc) + timedelta(days=3650)).timestamp()),
+        }
+        bot_token = jwt.encode(payload, JWT_SECRET_KEY_FOR_CHATBOT, algorithm="HS256")
+
+        if processed:
+            bot = Chatbot(
+                name=chatbot_name,
+                prompt=chatbot_prompt,
+                file_content=processed,
+                username=users_username,
+                token=bot_token,  # Uncommented this line
+            )
+            session.add(bot)
+            session.commit()
+            session.refresh(bot)
+            return {bot_token}
+        else:
+            raise HTTPException(status_code=400, detail="Failed to process file")
     except Exception as e:
-        raise HTTPException(status_code=403, detail="Token is invalid or expired")
+        # Include the actual error message for debugging
+        raise HTTPException(
+            status_code=403, detail=f"Token is invalid or expired: {str(e)}"
+        )

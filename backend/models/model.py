@@ -67,5 +67,5 @@ class Chatbot(Base):
     prompt = Column(String, nullable=False)
     file_content = Column(String, nullable=False)
     username = Column(String, ForeignKey("users.username"))
-
+    token = Column(String, unique=True, nullable=False)
     user = relationship("User", back_populates="chatbots")

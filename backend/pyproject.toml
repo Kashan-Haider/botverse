@@ -25,7 +25,8 @@ dependencies = [
     "pydantic[email] (>=2.11.3,<3.0.0)",
     "rank-bm25 (>=0.2.2,<0.3.0)",
     "langchain-chroma (>=0.2.3,<0.3.0)",
-    "nltk (>=3.9.1,<4.0.0)"
+    "nltk (>=3.9.1,<4.0.0)",
+    "alembic (>=1.15.2,<2.0.0)"
 ]
 
 [tool.poetry]
