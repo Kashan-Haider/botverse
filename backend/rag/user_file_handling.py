@@ -1,7 +1,9 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from rag.chromaSetup import collection
+from rag.chromaSetup import getCollection
 
-def file_handling(file_content: str) -> bool:
+
+def file_handling(file_content: str, collection_name:str) -> bool:
+    collection = getCollection(collection_name)
     try:
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,

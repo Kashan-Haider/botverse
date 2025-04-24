@@ -23,9 +23,11 @@ class LangchainEmbeddingFunction:
 chroma_client = chromadb.HttpClient(host="localhost", port=8001)
 
 embedding_function = LangchainEmbeddingFunction(embeddings)
-collection = chroma_client.get_or_create_collection(
-    name="cars", embedding_function=embedding_function
+def getCollection(collection_name):
+    collection = chroma_client.get_or_create_collection(
+    name=collection_name, embedding_function=embedding_function
 )
+    return collection
 
 
 def upsert_data(data):
@@ -58,10 +60,3 @@ def upsert_data(data):
 
     print("✅ Data processing complete!")
 
-
-def query(query):
-    results = collection.query(
-        query_texts=[query],
-        n_results=10,
-    )
-    return results
