@@ -1,10 +1,6 @@
-# import nltk
 import chromadb
 import numpy as np
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-# nltk.download("punkt")
 
 
 embeddings = HuggingFaceEmbeddings(
