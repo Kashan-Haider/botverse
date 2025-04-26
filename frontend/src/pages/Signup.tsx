@@ -28,7 +28,7 @@ const Signup = () => {
       });
 
       if (res.ok) {
-        navigate("/");
+        navigate("/login");
       } else {
         const data = await res.json();
         setError(data.detail || "Signup failed");
@@ -94,7 +94,7 @@ const Signup = () => {
         <p className="text-sm text-center">
           Already have an account?{" "}
           <Link
-            to="/"
+            to="/login"
             className="text-purple-400 hover:underline hover:text-purple-300"
           >
             Log In

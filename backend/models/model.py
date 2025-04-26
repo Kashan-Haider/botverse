@@ -63,7 +63,7 @@ class Chatbot(Base):
     __tablename__ = "chatbots"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=False, unique = True)
     prompt = Column(String, nullable=False)
     file_content = Column(String, nullable=False)
     username = Column(String, ForeignKey("users.username"))

@@ -84,9 +84,7 @@ def get_current_username(token: str) -> User:
         raise HTTPException(status_code=403, detail="Token is invalid or expired")
 
 
-def get_current_user(
-    token: str, session: Session = Depends(get_session)
-) -> User:
+def get_current_user(token: str, session: Session = Depends(get_session)) -> User:
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -115,16 +113,52 @@ def read_users(session: Session = Depends(get_session)):
     return users if users else "No users registered"
 
 
-@app.get("/users/me")
-def read_user(current_user: User = Depends(get_current_user)):
-    return current_user
+@app.post("/current-user")
+def read_user(
+    session: Session = Depends(get_session),
+    Authorization: str = Header(None),
+):
+
+    if not Authorization or not Authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = Authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=403, detail="Invalid token: no subject")
+
+        user = session.query(User).filter(User.username == username).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "user": user.to_dict(),
+            "chatbots": [
+                {
+                    "id": bot.id,
+                    "name": bot.name,
+                    "prompt": bot.prompt,
+                    "token": bot.token,
+                }
+                for bot in user.chatbots
+            ],
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=403, detail=f"Token is invalid or expired: {str(e)}"
+        )
 
 
 @app.post("/signup")
 def register_user(user: UserBase, session: Session = Depends(get_session)):
+
     existing_user = session.query(User).filter(User.username == user.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already exists")
+    existing_user_email = session.query(User).filter(User.email == user.email).first()
+    if existing_user or existing_user_email:
+        raise HTTPException(status_code=400, detail="Username/email already exists")
 
     new_user = User(
         username=user.username, email=user.email, password=hash_password(user.password)
@@ -184,26 +218,33 @@ async def create_chatbot(
     chatbot_prompt: str = Form(...),
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
-    authorization_token: str = Header(None),
+    Authorization: str = Header(None),
 ):
     # Check authorization
-    # if not authorization or not authorization.startswith("Bearer "):
-    #     raise HTTPException(status_code=401, detail="Invalid authorization header")
+    if not Authorization or not Authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
 
-    # token = authorization.replace("Bearer ", "")
-
-    token = authorization_token
-    print(token)
-
+    token = Authorization.replace("Bearer ", "")
     try:
         users_username = get_current_username(token)
 
-        # Read file content correctly - UploadFile needs to be handled differently
+        # Check if a chatbot with the same name already exists for the user
+        existing_chatbot = (
+            session.query(Chatbot)
+            .filter(Chatbot.username == users_username, Chatbot.name == chatbot_name)
+            .first()
+        )
+        if existing_chatbot:
+            raise HTTPException(
+                status_code=400, detail="Chatbot with this name already exists"
+            )
+
+        # Read file content correctly
         content = await file.read()
         content_str = content.decode("utf-8")
         collection_name = chatbot_name.replace(" ", "_").lower()
+
         processed = file_handling(content_str, collection_name)
-        print(processed)
 
         payload = {
             "username": users_username,
@@ -218,36 +259,35 @@ async def create_chatbot(
                 prompt=chatbot_prompt,
                 file_content=processed,
                 username=users_username,
-                token=bot_token,  # Uncommented this line
+                token=bot_token,
             )
             session.add(bot)
             session.commit()
             session.refresh(bot)
-            return {bot_token}
+            return {"bot_token": bot_token}
         else:
             raise HTTPException(status_code=400, detail="Failed to process file")
     except Exception as e:
-        # Include the actual error message for debugging
         raise HTTPException(
             status_code=403, detail=f"Token is invalid or expired: {str(e)}"
         )
 
 
 @app.post("/chat")
-async def chat( prompt:str, chat_token: str = Header(None), session: Session = Depends(get_session)):
+async def chat(
+    prompt: str, chat_token: str = Header(None), session: Session = Depends(get_session)
+):
     bot = session.query(Chatbot).filter(Chatbot.token == chat_token).first()
     if bot:
         collection_name = bot.name.replace(" ", "_").lower()
         collection = getCollection(collection_name)
         results = collection.query(
-        query_texts=[prompt],
-        n_results=10,
-    )
+            query_texts=[prompt],
+            n_results=10,
+        )
         return results
     else:
-        return("Bot not found")
-
-
+        return "Bot not found"
 
 
 # chatbot token

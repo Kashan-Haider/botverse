@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -8,8 +8,9 @@ const Home: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<boolean>(false);
+  const [upserting, setUpseting] = useState<boolean>(false);
   const [botToken, setBotToken] = useState<string>('');
-
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     const getToken = async () => {
       const accessToken = localStorage.getItem("access_token") || "";
@@ -50,15 +51,16 @@ const Home: React.FC = () => {
       formData.append("chatbot_name", chatbotName);
       formData.append("chatbot_prompt", chatbotPrompt);
       formData.append("file", file);
+      setUpseting(true)
       const token = localStorage.getItem("access_token");
       const res = await fetch("http://localhost:8000/create-chatbot", {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
-      console.log(res);
+      setUpseting(false)
       const data = await res.json();
-      setBotToken(data)
+      setBotToken(data.bot_token)
       if (!res.ok) throw new Error(data.detail || "Failed to create chatbot.");
       setSuccess(true);
       setChatbotName("");
@@ -71,11 +73,33 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+    <Link to={'/profile'} className="absolute top-5 right-5 bg-gray-100 px-3 py-1 rounded-2xl shadow-lg shadow-black" >Profile</Link>
       {success ? (
-        <div className="text-white">
-          <h1>Your bot token</h1>
+        <div className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md text-white text-center space-y-4">
+        <h2 className="text-2xl font-bold">🎉 Chatbot Created Successfully!</h2>
+        <p className="text-gray-300">Here is your bot token. Copy and save it securely:</p>
+        <div className="bg-gray-700 p-4 rounded-md text-sm break-all border border-gray-600">
           {botToken}
         </div>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(botToken);
+            setCopied(true)
+          }}
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md text-white font-medium transition duration-200"
+        >
+          {copied ? <p> Copied! </p> : <p>Copy to Clipboard</p>}
+        </button>
+        <button
+          onClick={() => {
+            setSuccess(false);
+            setBotToken("");
+          }}
+          className="block w-full mt-4 bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-md text-white transition duration-200"
+        >
+          Create Another Bot
+        </button>
+      </div>
       ) : (
         <div className="w-full max-w-lg bg-gray-800 p-8 rounded-xl shadow-md">
           <h2 className="text-3xl font-bold text-white mb-6 text-center">
@@ -116,12 +140,12 @@ const Home: React.FC = () => {
             </div>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             {success && <p className="text-green-400 text-sm">{success}</p>}
-            <button
+            {upserting ? <h1 className="text-white">Creating your chatbot ...</h1> : <button
               type="submit"
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md transition duration-200"
             >
               Create
-            </button>
+            </button>}
           </form>
         </div>
       )}
@@ -130,3 +154,4 @@ const Home: React.FC = () => {
 };
 
 export default Home;
+
