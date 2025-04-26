@@ -74,10 +74,6 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="absolute top-5 right-5 flex flex-col gap-3">
-    <Link to={'/profile'} className="bg-gray-100 px-3 py-1 rounded-2xl shadow-lg shadow-black" >Profile</Link>
-    <Link to={'/chat'} className="bg-gray-100 px-3 py-1 rounded-2xl shadow-lg shadow-black" >Test Chat</Link>
-      </div>
       {success ? (
         <div className="w-full max-w-md bg-gray-800 p-6 rounded-xl shadow-md text-white text-center space-y-4">
         <h2 className="text-2xl font-bold">🎉 Chatbot Created Successfully!</h2>
