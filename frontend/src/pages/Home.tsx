@@ -18,11 +18,11 @@ const Home: React.FC = () => {
       const refreshToken = localStorage.getItem("refresh_token") || "";
       try {
         const verifyRes = await fetch(
-          `http://localhost:8000/verify-token/${accessToken}`,
+          `http://localhost:8000/users/verify-token/${accessToken}`,
           { method: "GET", headers: { "Content-Type": "application/json" } }
         );
         if (verifyRes.status === 403 && refreshToken) {
-          const refreshRes = await fetch("http://localhost:8000/refresh", {
+          const refreshRes = await fetch("http://localhost:8000/users/refresh", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ refresh_token: refreshToken }),
@@ -54,7 +54,7 @@ const Home: React.FC = () => {
       formData.append("file", file);
       setUpseting(true)
       const token = localStorage.getItem("access_token");
-      const res = await fetch("http://localhost:8000/create-chatbot", {
+      const res = await fetch("http://localhost:8000/chatbots/create-chatbot", {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,

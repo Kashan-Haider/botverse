@@ -16,7 +16,7 @@ const Profile = () => {
       const getToken = async () => {
         try {
           const verifyRes = await fetch(
-            `http://localhost:8000/verify-token/${accessToken}`,
+            `http://localhost:8000/users/verify-token/${accessToken}`,
             { method: "GET", headers: { "Content-Type": "application/json" } }
           );
           if (verifyRes.status === 403 && refreshToken) {
@@ -38,7 +38,7 @@ const Profile = () => {
       await getToken();
 
       try {
-        const response = await fetch("http://localhost:8000/current-user", {
+        const response = await fetch("http://localhost:8000/users/current-user", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

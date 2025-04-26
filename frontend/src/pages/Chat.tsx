@@ -14,11 +14,11 @@ const Chat = () => {
       const refreshToken = localStorage.getItem("refresh_token") || "";
       try {
         const verifyRes = await fetch(
-          `http://localhost:8000/verify-token/${accessToken}`,
+          `http://localhost:8000/users/verify-token/${accessToken}`,
           { method: "GET", headers: { "Content-Type": "application/json" } }
         );
         if (verifyRes.status === 403 && refreshToken) {
-          const refreshRes = await fetch("http://localhost:8000/refresh", {
+          const refreshRes = await fetch("http://localhost:8000/users/refresh", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ refresh_token: refreshToken }),
@@ -39,7 +39,7 @@ const Chat = () => {
   const getResponse = async () => {
     if (prompt && chat_token) {
         setLoading(true)
-      const res = await fetch("http://localhost:8000/test-chat", {
+      const res = await fetch("http://localhost:8000/chatbots/test-chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
