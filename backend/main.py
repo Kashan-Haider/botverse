@@ -12,6 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from rag.user_file_handling import file_handling
 from rag.chromaSetup import getCollection
+from rag.GeminiSetup import llm
+
+
+class ChatRequest(BaseModel):
+    prompt: str
+    chat_token: str
+
 
 load_dotenv()
 
@@ -285,11 +292,51 @@ async def chat(
             query_texts=[prompt],
             n_results=10,
         )
-        return results
+        system_message = (
+            f"{bot.prompt}. "
+            "Answer the users query according to the following context and do not add anything other than context. Answer the user in like a human being in english language with a softer tone"
+            "If the query is not related to the context then just return I DONT KNOW. "
+            f"Context: {results['documents']}"
+        )
+
+        messages = [
+            ("system", system_message),
+            ("human", prompt),
+        ]
+
+        res = llm.invoke(messages)
+
+        return res
     else:
         return "Bot not found"
 
 
-# chatbot token
+@app.post("/test-chat")
+async def chat(request: ChatRequest, session: Session = Depends(get_session)):
+    bot: Chatbot = (
+        session.query(Chatbot).filter(Chatbot.token == request.chat_token).first()
+    )
+    if bot:
+        collection_name = bot.name.replace(" ", "_").lower()
+        collection = getCollection(collection_name)
+        results = collection.query(
+            query_texts=[request.prompt],
+            n_results=10,
+        )
+        system_message = (
+            f"{bot.prompt}. "
+            "Answer the users query according to the following context and do not add anything other than context. Answer the user in like a human being in english language with a softer tone"
+            "If the query is not related to the context then just return I DONT KNOW. "
+            f"Context: {results['documents']}"
+        )
 
-# cars : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InN0cmluZyIsImNoYXRib3RfbmFtZSI6ImNhcnMiLCJleHAiOjIwNjA4ODA3NzN9.GGl8PQsCcWQqpQU-Opuol-1rud9rTq1cw2Bgs6a_KKM
+        messages = [
+            ("system", system_message),
+            ("human", request.prompt),
+        ]
+
+        res = llm.invoke(messages)
+
+        return res
+    else:
+        return "Bot not found"

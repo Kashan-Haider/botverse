@@ -25,6 +25,3 @@ def getCollection(collection_name):
         name=collection_name, embedding_function=embedding_function
     )
     return collection
-
-
-collection = getCollection("cars")
