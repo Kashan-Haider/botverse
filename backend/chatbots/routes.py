@@ -15,6 +15,9 @@ class ChatRequest(BaseModel):
     prompt: str
     chat_token: str
     
+class ExternalChatRequest(BaseModel):
+    prompt: str
+    
 router = APIRouter()
 
 @router.post("/create-chatbot")
@@ -80,14 +83,19 @@ async def create_chatbot(
 
 @router.post("/chat")
 async def chat(
-    prompt: str, chat_token: str = Header(None), session: Session = Depends(get_session)
+    request: ExternalChatRequest, chat_token: str = Header(None), session: Session = Depends(get_session)
 ):
+    print(f"Received token: {chat_token}")
+
     bot = session.query(Chatbot).filter(Chatbot.token == chat_token).first()
+
+    print(f"Bot found: {bot is not None}")
+    
     if bot:
         collection_name = bot.name.replace(" ", "_").lower()
         collection = getCollection(collection_name)
         results = collection.query(
-            query_texts=[prompt],
+            query_texts=[request.prompt],
             n_results=10,
         )
         system_message = (
@@ -99,14 +107,14 @@ async def chat(
 
         messages = [
             ("system", system_message),
-            ("human", prompt),
+            ("human", request.prompt),
         ]
 
         res = llm.invoke(messages)
 
         return res
     else:
-        return "Bot not found"
+        raise HTTPException( status_code=404 , detail  = "Bot not found") 
 
 
 @router.post("/test-chat")
