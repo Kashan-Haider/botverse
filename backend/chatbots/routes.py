@@ -28,15 +28,12 @@ async def create_chatbot(
     session: Session = Depends(get_session),
     Authorization: str = Header(None),
 ):
-    # Check authorization
     if not Authorization or not Authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = Authorization.replace("Bearer ", "")
     try:
         users_username = get_current_username(token)
-
-        # Check if a chatbot with the same name already exists for the user
         existing_chatbot = (
             session.query(Chatbot)
             .filter(Chatbot.username == users_username, Chatbot.name == chatbot_name)
@@ -46,8 +43,6 @@ async def create_chatbot(
             raise HTTPException(
                 status_code=400, detail="Chatbot with this name already exists"
             )
-
-        # Read file content correctly
         content = await file.read()
         content_str = content.decode("utf-8")
         collection_name = chatbot_name.replace(" ", "_").lower()
@@ -83,13 +78,9 @@ async def create_chatbot(
 
 @router.post("/chat")
 async def chat(
-    request: ExternalChatRequest, chat_token: str = Header(None), session: Session = Depends(get_session)
+    request: ExternalChatRequest, chatToken: str = Header(None), session: Session = Depends(get_session)
 ):
-    print(f"Received token: {chat_token}")
-
-    bot = session.query(Chatbot).filter(Chatbot.token == chat_token).first()
-
-    print(f"Bot found: {bot is not None}")
+    bot = session.query(Chatbot).filter(Chatbot.token == chatToken).first()
     
     if bot:
         collection_name = bot.name.replace(" ", "_").lower()

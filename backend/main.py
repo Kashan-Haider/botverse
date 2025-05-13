@@ -4,7 +4,7 @@ from database.db import create_db_and_tables
 from users.routes import router as user_router
 from chatbots.routes import router as chatbot_router
 
-async def lifespan_handler(app: FastAPI):
+async def lifespan_handler():
     create_db_and_tables()
     yield
 
